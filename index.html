@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股損益計算機</title>
+    <style>
+        :root {
+            --bg: #0b0e11;
+            --card: #1e2329;
+            --border: #30363d;
+            --text: #eaecef;
+            --dim: #848e9c;
+            --up: #f6465d;
+            --down: #2ebd85;
+            --gold: #f0b90b;
+        }
+
+        body {
+            font-family: "PingFang TC", "微軟正黑體", sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+
+        .container { 
+            width: 95%; 
+            max-width: 1200px; 
+        }
+        
+        .header {
+            border-left: 5px solid var(--gold);
+            padding-left: 20px;
+            margin-bottom: 25px;
+        }
+        .header h2 { font-size: 24px; margin: 0; color: var(--gold); letter-spacing: 1px; }
+
+        .panel {
+            background: var(--card);
+            padding: 25px;
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .group { display: flex; flex-direction: column; }
+        .group label { font-size: 14px; color: var(--dim); margin-bottom: 8px; font-weight: bold; }
+        
+        .tick-ctrl {
+            display: flex;
+            align-items: center;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            height: 45px;
+        }
+        .tick-ctrl input {
+            border: none;
+            text-align: center;
+            flex: 1;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 18px;
+            font-weight: bold;
+            width: 100%;
+        }
+        .tick-btn {
+            background: #2b3139;
+            color: var(--text);
+            border: none;
+            width: 50px;
+            height: 100%;
+            cursor: pointer;
+            font-size: 22px;
+            transition: 0.2s;
+        }
+        .tick-btn:hover { background: #3e454d; color: var(--gold); }
+
+        select, input[type="number"]:not(#bPrice) {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .btn-main {
+            grid-column: 1 / -1;
+            background: var(--gold);
+            color: #000;
+            border: none;
+            padding: 16px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .shift-ctrl {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn-shift {
+            background: #2b3139;
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .btn-shift:hover { border-color: var(--gold); color: var(--gold); }
+        .btn-shift.plus { color: var(--up); border-color: rgba(246, 70, 93, 0.3); }
+        .btn-shift.minus { color: var(--down); border-color: rgba(46, 189, 133, 0.3); }
+
+        #buySummary {
+            grid-column: 1 / -1;
+            background: rgba(240, 185, 11, 0.1);
+            padding: 18px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .table-section {
+            margin-top: 30px;
+            background: var(--card);
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        th { background: #2b3139; color: var(--dim); padding: 18px 12px; font-size: 15px; text-align: center; border-bottom: 2px solid var(--border); }
+        td { padding: 16px 12px; border-bottom: 1px solid var(--border); font-family: 'Consolas', monospace; text-align: center; font-size: 16px; }
+
+        .row-focus { background: rgba(240, 185, 11, 0.15); }
+        .up { color: var(--up); font-weight: bold; }
+        .down { color: var(--down); font-weight: bold; }
+        .fee-info { font-size: 12px; color: var(--dim); display: block; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>台股損益計算機</h2>
+    </div>
+
+    <div class="panel">
+        <div class="group" style="grid-column: span 2;">
+            <label>買入價格 (點擊 +/- 調整 1 檔)</label>
+            <div class="tick-ctrl">
+                <button class="tick-btn" onclick="adjustPrice(-1)">-</button>
+                <input type="number" id="bPrice" step="0.01" value="100.00">
+                <button class="tick-btn" onclick="adjustPrice(1)">+</button>
+            </div>
+        </div>
+        <div class="group">
+            <label>買入張數</label>
+            <input type="number" id="bQty" value="1">
+        </div>
+        <div class="group">
+            <label>賣出張數</label>
+            <input type="number" id="sQty" value="1">
+        </div>
+        <div class="group">
+            <label>手續費折扣</label>
+            <input type="number" id="disc" value="0.28" step="0.01">
+        </div>
+        <div class="group">
+            <label>交易模式</label>
+            <select id="tType">
+                <option value="0.003">一般現股 (稅 0.3%)</option>
+                <option value="0.0015">當沖交易 (稅 0.15%)</option>
+            </select>
+        </div>
+        
+        <button class="btn-main" onclick="resetAndCalc()">執行試算</button>
+
+        <div class="shift-ctrl">
+            <button class="btn-shift plus" onclick="updateOffset(5)">獲利區平移 +5 檔 ⬆</button>
+            <button class="btn-shift" onclick="updateOffset(0)">回歸買入價基準</button>
+            <button class="btn-shift minus" onclick="updateOffset(-5)">虧損區平移 -5 檔 ⬇</button>
+        </div>
+
+        <div id="buySummary"></div>
+    </div>
+
+    <div class="table-section">
+        <table id="resTable" style="display:none;">
+            <thead>
+                <tr>
+                    <th>賣出價格 (Tick)</th>
+                    <th>交易稅 + 賣出手續費<br><span class="fee-info">(已扣除折讓)</span></th>
+                    <th>單張純獲利</th>
+                    <th>淨損益總額</th>
+                    <th>預期報酬率 (ROI)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let currentOffset = 0;
+
+    function getTick(p) {
+        if (p < 10) return 0.01;
+        if (p < 50) return 0.05;
+        if (p < 100) return 0.1;
+        if (p < 500) return 0.5;
+        if (p < 1000) return 1;
+        return 5;
+    }
+
+    function adjustPrice(direction) {
+        const input = document.getElementById('bPrice');
+        let currentP = parseFloat(input.value);
+        let tick = (direction > 0) ? getTick(currentP) : getTick(currentP - 0.0001);
+        let newP = direction > 0 ? currentP + tick : currentP - tick;
+        input.value = (Math.round(newP * 100) / 100).toFixed(2);
+        calculate();
+    }
+
+    function updateOffset(val) {
+        if (val === 0) currentOffset = 0;
+        else currentOffset += val;
+        calculate();
+    }
+
+    function resetAndCalc() {
+        currentOffset = 0;
+        calculate();
+    }
+
+    function moveTick(price, steps) {
+        let p = parseFloat(price);
+        for (let i = 0; i < Math.abs(steps); i++) {
+            let t = (steps > 0) ? getTick(p) : getTick(p - 0.0001);
+            p = (steps > 0) ? p + t : p - t;
+            p = Math.round(p * 100) / 100;
+        }
+        return p;
+    }
+
+    function calculate() {
+        const bPrice = parseFloat(document.getElementById('bPrice').value);
+        const bQty = parseInt(document.getElementById('bQty').value);
+        const sQty = parseInt(document.getElementById('sQty').value);
+        const disc = parseFloat(document.getElementById('disc').value);
+        const taxRate = parseFloat(document.getElementById('tType').value);
+
+        if (!bPrice || isNaN(bQty) || isNaN(sQty)) return;
+
+        const buyPrincipal = bPrice * 1000 * bQty;
+        const rawBuyFee = Math.floor(buyPrincipal * 0.001425);
+        const netBuyFee = Math.max(1, Math.floor(rawBuyFee * disc));
+        const totalBuyCost = buyPrincipal + netBuyFee;
+
+        const summary = document.getElementById('buySummary');
+        summary.style.display = "block";
+        summary.innerHTML = `💰 總買入成本 (含手續費)：${totalBuyCost.toLocaleString()} 元`;
+
+        const tbody = document.querySelector('#resTable tbody');
+        tbody.innerHTML = "";
+        document.getElementById('resTable').style.display = "table";
+
+        const proRatedCost = totalBuyCost * (sQty / bQty);
+        const startIdx = 8 + currentOffset;
+        const endIdx = -8 + currentOffset;
+
+        for (let i = startIdx; i >= endIdx; i--) {
+            let curSellP = moveTick(bPrice, i);
+            let sellAmt = curSellP * 1000 * sQty;
+            let netSellFee = Math.max(1, Math.floor(Math.floor(sellAmt * 0.001425) * disc));
+            let tax = Math.floor(sellAmt * taxRate);
+            
+            let netRevenue = sellAmt - netSellFee - tax;
+            let netProfit = Math.round(netRevenue - proRatedCost);
+            let perLotProfit = Math.round(netProfit / sQty);
+            let roi = ((netProfit / proRatedCost) * 100).toFixed(2);
+
+            let isBase = (i === 0);
+            let rowClass = isBase ? "row-focus" : "";
+            let valClass = netProfit > 0 ? "up" : (netProfit < 0 ? "down" : "");
+            let sign = netProfit > 0 ? "+" : "";
+
+            tbody.innerHTML += `
+                <tr class="${rowClass}">
+                    <td style="font-weight:bold; color: ${isBase ? 'var(--gold)' : 'inherit'}">
+                        ${curSellP.toFixed(2)} ${isBase ? '<br><small>(買入價)</small>' : ''}
+                    </td>
+                    <td>${(netSellFee + tax).toLocaleString()}</td>
+                    <td class="${valClass}">${sign}${perLotProfit.toLocaleString()}</td>
+                    <td class="${valClass}">${sign}${netProfit.toLocaleString()}</td>
+                    <td class="${valClass}">${sign}${roi}%</td>
+                </tr>
+            `;
+        }
+    }
+</script>
+
+</body>
+</html>
